@@ -2,51 +2,78 @@ package sender;
 
 import util.Packet;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
+import java.io.*;
+import java.net.*;
+import java.util.Arrays;
+import java.util.Random;
 
 /**
  * Created by Administrator on 2017/12/4.
  */
 public class Sender {
-    public static void main(String[] args) throws IOException {
-        /*
-         * 接收客户端发送的数据
-         */
-        // 1.创建服务器端DatagramSocket，指定端口
-        DatagramSocket socket = new DatagramSocket(8800);
-        // 2.创建数据报，用于接收客户端发送的数据
-        byte[] data = new byte[1024];// 创建字节数组，指定接收的数据包的大小
-        DatagramPacket packet = new DatagramPacket(data, data.length);
-        // 3.接收客户端发送的数据
-        System.out.println("****服务器端已经启动，等待客户端发送数据");
-        socket.receive(packet);// 此方法在接收到数据报之前会一直阻塞
-        // 4.读取数据
-        String info = new String(data, 0, packet.getLength());
-        System.out.println("我是服务器，客户端说：" + info);
 
-        /*
-         * 向客户端响应数据
-         */
-        // 1.定义客户端的地址、端口号、数据
-        InetAddress address = packet.getAddress();
-        int port = packet.getPort();
-        byte[] data2 = "欢迎您!".getBytes();
-        // 2.创建数据报，包含响应的数据信息
-        Packet myPacket = new Packet();
-        ByteArrayOutputStream bstream = new ByteArrayOutputStream(1024);
-        ObjectOutputStream stream = new ObjectOutputStream(bstream);
-        stream.writeObject(myPacket);
-        data2 = bstream.toByteArray();
-        System.out.println(data2.toString());
-        DatagramPacket packet2 = new DatagramPacket(data2, data2.length, address, port);
-        // 3.响应客户端
-        socket.send(packet2);
-        // 4.关闭资源
+    private int isn = 123;
+    private DatagramSocket socket;
+    //建立连接
+    public void connect(Inet4Address ip, int port) throws IOException, InterruptedException {
+        socket = new DatagramSocket();
+        //第一次握手
+        Packet packet = new Packet((byte) 1, (byte) 0, (byte) 0, (byte) isn);
+        byte[] data = packet.toByteArray();
+        DatagramPacket udpPacket = new DatagramPacket(data,data.length,ip,port);
+        socket.send(udpPacket);
+        //第二次握手
+        data = new byte[data.length];
+        udpPacket = new DatagramPacket(data,data.length);
+        socket.receive(udpPacket);
+        //第三次握手
+        packet = new Packet(data);
+        if(packet.getSYN() == 1 && packet.getACK() == (isn + 1)){
+            packet.setSYN((byte) 0);
+            packet.setACK((byte) (packet.getSEQ() + 1));
+            packet.setSEQ((byte) (isn + 1));
+        }else{
+            throw new RuntimeException("Sender第二次握手失败");
+        }
+        data = packet.toByteArray();
+        udpPacket = new DatagramPacket(data,data.length,ip,port);
+        Thread.sleep(100);
+        socket.send(udpPacket);
+    }
+
+    public void transferFile(int mws){
+        String str = "从c语言过来的程序员可定知道在写一些窗口程序的时候，如果要让程序暂停一段是将，那么直接引入windows.h头文件，然后在程序的任何地方写上Sleep(N)——N表示要暂停的毫秒数，就OK了，那么在java中如果要让程序暂停一段时间，使用线程中的sleep函数就能实现了。\n" +
+                "示例代码：";
+        byte[] fileData = str.getBytes();
+        int currentWindow = 0;
+
+
+    }
+
+    public void close(){
+
         socket.close();
+    }
+
+
+    public static void main(String[] args) throws IOException, InterruptedException {
+        String[] addrstr = args[0].split("\\.");
+        byte[] addrbyte = new byte[4];
+        for (int i = 0; i < addrbyte.length; i++) {
+            addrbyte[i] = Byte.parseByte(addrstr[i]);
+        }
+        Inet4Address ip = (Inet4Address) Inet4Address.getByAddress(addrbyte);
+        int port = Integer.parseInt(args[1]);
+        String file = args[2];
+        int mws = Integer.parseInt(args[3]);
+        int timeout = Integer.parseInt(args[4]);
+        double pdrop = Double.parseDouble(args[5]);
+        Random random = new Random(Integer.parseInt(args[6]));
+
+        Sender sender = new Sender();
+        sender.connect(ip,port);
+        sender.transferFile(mws);
+        sender.close();
+
     }
 }

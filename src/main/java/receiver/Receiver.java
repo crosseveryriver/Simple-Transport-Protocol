@@ -6,43 +6,56 @@ import java.io.*;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketException;
+import java.util.Arrays;
 
 /**
  * Created by Administrator on 2017/12/4.
  */
 public class Receiver {
-    public static void main(String[] args) throws IOException, ClassNotFoundException {
-        /*
-         * 向服务器端发送数据
-         */
-        // 1.定义服务器的地址、端口号、数据
-        InetAddress address = InetAddress.getByName("localhost");
-        int port = 8800;
-        byte[] data = "用户名：admin;密码：123".getBytes();
-        // 2.创建数据报，包含发送的数据信息
-        DatagramPacket packet = new DatagramPacket(data, data.length, address, port);
-        // 3.创建DatagramSocket对象
-        DatagramSocket socket = new DatagramSocket();
-        // 4.向服务器端发送数据报
-        socket.send(packet);
 
-        /*
-         * 接收服务器端响应的数据
-         */
-        // 1.创建数据报，用于接收服务器端响应的数据
-        byte[] data2 = new byte[1024];
-        DatagramPacket packet2 = new DatagramPacket(data2, data2.length);
-        // 2.接收服务器响应的数据
-        socket.receive(packet2);
+    private int isn = 32;
+    private DatagramSocket socket;
 
-        ByteArrayInputStream bstream = new ByteArrayInputStream(data2);
-        ObjectInputStream ois = new ObjectInputStream(bstream);
-        Packet packet1 = (Packet) ois.readObject();
-        System.out.println(packet1.toString());
-        // 3.读取数据
-        String reply = new String(data2, 0, packet2.getLength());
-        System.out.println("我是客户端，服务器说：" + reply);
-        // 4.关闭资源
+    public void waitAndConnect(int port) throws IOException, InterruptedException {
+      socket = new DatagramSocket(port);
+      byte[] data = new byte[10];
+      DatagramPacket udpPacket = new DatagramPacket(data,data.length);
+      //第一次握手
+      socket.receive(udpPacket);
+      //第二次握手
+      Packet packet = new Packet(data);
+        int senderIsn = packet.getSEQ();
+      if(packet.getSYN() == 1){
+          packet.setACK((byte) (packet.getSEQ() + 1));
+          packet.setSEQ((byte) isn);
+      }
+      data = packet.toByteArray();
+      udpPacket = new DatagramPacket(data,data.length,udpPacket.getAddress(),udpPacket.getPort());
+      Thread.sleep(100);
+      socket.send(udpPacket);
+      //第三次握手
+        socket.receive(udpPacket);
+        packet = new Packet(data);
+        if(packet.getACK() != (isn + 1) || packet.getSEQ() != (senderIsn + 1)){
+            throw new RuntimeException("Reveiver第三次握手失败");
+        }
+    }
+
+    public void processPacket(){}
+
+    public void saveData(){}
+
+    public void handleClose(){
         socket.close();
+    }
+
+    public static void main(String[] args) throws IOException, ClassNotFoundException, InterruptedException {
+
+        int port = Integer.parseInt(args[0]);
+        String file = args[1];
+        Receiver receiver = new Receiver();
+        receiver.waitAndConnect(port);
+
     }
 }
