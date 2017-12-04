@@ -6,6 +6,8 @@ import java.io.*;
 import java.net.*;
 import java.util.Arrays;
 import java.util.Random;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * Created by Administrator on 2017/12/4.
@@ -15,17 +17,33 @@ public class Sender {
     private int isn = 123;
     private DatagramSocket socket;
     //建立连接
-    public void connect(Inet4Address ip, int port) throws IOException, InterruptedException {
+    public void connect(Inet4Address ip, int port,int timeout) throws IOException, InterruptedException {
         socket = new DatagramSocket();
+        Timer timer = new Timer();
+        TimerTask task;
+
         //第一次握手
         Packet packet = new Packet((byte) 1, (byte) 0, (byte) 0, (byte) isn);
         byte[] data = packet.toByteArray();
         DatagramPacket udpPacket = new DatagramPacket(data,data.length,ip,port);
         socket.send(udpPacket);
+        final DatagramPacket finalPacket = udpPacket;
+        task = new TimerTask() {
+            @Override
+            public void run() {
+                try {
+                    socket.send(finalPacket);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+        timer.schedule(task,timeout,timeout);
         //第二次握手
         data = new byte[data.length];
         udpPacket = new DatagramPacket(data,data.length);
         socket.receive(udpPacket);
+        task.cancel();
         //第三次握手
         packet = new Packet(data);
         if(packet.getSYN() == 1 && packet.getACK() == (isn + 1)){
@@ -71,7 +89,7 @@ public class Sender {
         Random random = new Random(Integer.parseInt(args[6]));
 
         Sender sender = new Sender();
-        sender.connect(ip,port);
+        sender.connect(ip,port,timeout);
         sender.transferFile(mws);
         sender.close();
 
