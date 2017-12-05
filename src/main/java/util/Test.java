@@ -16,7 +16,7 @@ public class Test {
 
     public static void main(String[] args) throws IOException, InterruptedException {
         Test t = new Test();
-        t.fileTest();
+        t.listenPort();
     }
 
     public void fileTest() throws IOException {

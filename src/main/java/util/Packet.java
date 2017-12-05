@@ -3,6 +3,7 @@ package util;
 import com.sun.xml.internal.bind.v2.runtime.reflect.Lister;
 
 import java.io.Serializable;
+import java.util.Arrays;
 
 /**
  * Created by Administrator on 2017/12/4.
@@ -15,6 +16,14 @@ public class Packet implements Serializable{
     private byte SEQ = 0;
     private byte[] data;
 
+    public Packet(byte[] data,int length,byte seq){
+        byte[] tmp = new byte[length];
+        System.arraycopy(data,0,tmp,0,length);
+        if(tmp.length > 20)
+            throw new RuntimeException("STP packet data too long");
+        this.data = tmp;
+        this.SEQ = seq;
+    }
     public Packet(byte[] data,byte seq){
         if(data.length > 20)
             throw new RuntimeException("STP packet data too long");
@@ -103,5 +112,25 @@ public class Packet implements Serializable{
         result[3] = FIN;
         result[4] = SEQ;
         return result;
+    }
+
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Packet packet = (Packet) o;
+
+        if (SYN != packet.SYN) return false;
+        if (ACK != packet.ACK) return false;
+        if (FIN != packet.FIN) return false;
+        if (SEQ != packet.SEQ) return false;
+        return Arrays.equals(data, packet.data);
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(data);
     }
 }
