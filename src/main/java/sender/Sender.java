@@ -11,6 +11,7 @@ import java.util.TimerTask;
 
 /**
  * Created by Administrator on 2017/12/4.
+ * 命令行参数 127.0.0.1 8800 file.txt 2000 3000 0.5 50
  */
 public class Sender {
 

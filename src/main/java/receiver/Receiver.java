@@ -11,6 +11,7 @@ import java.util.Arrays;
 
 /**
  * Created by Administrator on 2017/12/4.
+ * 命令行参数 8800 file.txt
  */
 public class Receiver {
 
