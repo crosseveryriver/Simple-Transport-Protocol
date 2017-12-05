@@ -45,6 +45,7 @@ public class Sender {
         udpPacket = new DatagramPacket(data,data.length);
         socket.receive(udpPacket);
         task.cancel();
+        timer.cancel();
         //第三次握手
         packet = new Packet(data);
         if(packet.getSYN() == 1 && packet.getACK() == (isn + 1)){
@@ -65,8 +66,6 @@ public class Sender {
                 "示例代码：";
         byte[] fileData = str.getBytes();
         int currentWindow = 0;
-
-
     }
 
     public void close(){
