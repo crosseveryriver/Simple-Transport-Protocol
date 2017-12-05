@@ -4,21 +4,29 @@ import util.Packet;
 
 import java.io.*;
 import java.net.*;
-import java.util.Arrays;
-import java.util.Random;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 
 /**
  * Created by Administrator on 2017/12/4.
- * 命令行参数 127.0.0.1 8800 file.txt 2000 3000 0.5 50
+ * 命令行参数 127.0.0.1 8800 file.txt 200 3000 0.5 50
  */
 public class Sender {
 
     private int isn = 123;
     private DatagramSocket socket;
+    InetAddress ip;
+    int port;
+
+    byte[] fileData;
+    byte[] data = new byte[30];
+    byte front = 0;
+    byte tail = 0;
+    HashSet<Byte> set = new HashSet<Byte>();
     //建立连接
-    public void connect(Inet4Address ip, int port,int timeout) throws IOException, InterruptedException {
+    public void connect(InetAddress ip, int port,int timeout) throws IOException, InterruptedException {
+        this.ip = ip;
+        this.port = port;
+
         socket = new DatagramSocket();
         Timer timer = new Timer();
         TimerTask task;
@@ -61,11 +69,68 @@ public class Sender {
         socket.send(udpPacket);
     }
 
-    public void transferFile(int mws){
+    public void transferFile(final int mws){
         String str = "从c语言过来的程序员可定知道在写一些窗口程序的时候，如果要让程序暂停一段是将，那么直接引入windows.h头文件，然后在程序的任何地方写上Sleep(N)——N表示要暂停的毫秒数，就OK了，那么在java中如果要让程序暂停一段时间，使用线程中的sleep函数就能实现了。\n" +
                 "示例代码：";
-        byte[] fileData = str.getBytes();
-        int currentWindow = 0;
+        fileData = str.getBytes();
+        Thread listen = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    socket.receive(new DatagramPacket(data,data.length));
+                    Packet packet = new Packet(data);
+                        if(data[0] == 0){
+                            synchronized (set){
+                                if(set.contains(packet.getACK()))
+                                    set.remove(packet.getACK());
+                                front = Collections.min(set);
+                            }
+                        }
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        listen.start();
+
+        Thread send = new Thread(new Runnable() {
+            public void run() {
+                byte[] toSend;
+                   while(true){
+                       if ((tail - front) < (mws/20)){
+                           System.out.println(mws/20);
+                           if(tail * 20 < fileData.length){
+                               int length = Math.min(20,fileData.length - tail * 20);
+                               toSend = new byte[length];
+                               System.arraycopy(fileData,tail * 20,toSend,0,length);
+                               Packet packet = new Packet(toSend,(byte) tail);
+                               packet.setSEQ(tail);
+                               byte[] packetData = packet.toByteArray();
+                               try {
+                                   socket.send(new DatagramPacket(packetData,packetData.length,ip,port));
+                                   synchronized (set){
+                                       set.add(tail);
+                                   }
+                               } catch (IOException e) {
+                                   e.printStackTrace();
+                               }
+                               tail ++;
+                           }else {
+                               break;
+                           }
+                       }else {
+                           try {
+                               System.out.println("未收到确认消息,暂停1s后继续");
+                               Thread.sleep(1000);
+                           } catch (InterruptedException e) {
+                               e.printStackTrace();
+                           }
+                       }
+                   }
+            }
+        });
+        send.start();
+
     }
 
     public void close(){
@@ -91,7 +156,7 @@ public class Sender {
         Sender sender = new Sender();
         sender.connect(ip,port,timeout);
         sender.transferFile(mws);
-        sender.close();
+//        sender.close();
 
     }
 }

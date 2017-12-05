@@ -7,6 +7,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.util.ArrayList;
 import java.util.Arrays;
 
 /**
@@ -17,6 +18,9 @@ public class Receiver {
 
     private int isn = 32;
     private DatagramSocket socket;
+    ArrayList<byte[]> buffer = new ArrayList<byte[]>();
+    InetAddress ip;
+    int port;
 
     public void waitAndConnect(int port) throws IOException, InterruptedException {
       socket = new DatagramSocket(port);
@@ -32,7 +36,9 @@ public class Receiver {
           packet.setSEQ((byte) isn);
       }
       data = packet.toByteArray();
-      udpPacket = new DatagramPacket(data,data.length,udpPacket.getAddress(),udpPacket.getPort());
+      ip = udpPacket.getAddress();
+      this.port = udpPacket.getPort();
+      udpPacket = new DatagramPacket(data,data.length,ip,this.port);
       Thread.sleep(100);
       socket.send(udpPacket);
       //第三次握手
@@ -45,7 +51,26 @@ public class Receiver {
 
     public void processPacket(){}
 
-    public void saveData(){}
+    public void saveData() throws IOException {
+
+        byte[] data = new byte[30];
+        DatagramPacket packet = new DatagramPacket(data,data.length,ip,port);
+        do{
+            try {
+                socket.receive(packet);
+                Packet stpPacket = new Packet(data);
+                if(stpPacket.getFIN() != 0)
+                    break;
+                buffer.add(stpPacket.getData());
+                stpPacket = new Packet((byte) 0,stpPacket.getSEQ(),(byte) 0 ,(byte) 0);
+                data = stpPacket.toByteArray();
+                packet = new DatagramPacket(data, data.length,ip,port);
+                socket.send(packet);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }while(true);
+    }
 
     public void handleClose(){
         socket.close();
@@ -57,6 +82,8 @@ public class Receiver {
         String file = args[1];
         Receiver receiver = new Receiver();
         receiver.waitAndConnect(port);
+        receiver.saveData();
+//        receiver.handleClose();
 
     }
 }
