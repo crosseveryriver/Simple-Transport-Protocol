@@ -3,6 +3,7 @@ package sender;
 import util.Packet;
 
 import java.io.*;
+import java.lang.reflect.Array;
 import java.net.*;
 import java.util.*;
 
@@ -12,21 +13,86 @@ import java.util.*;
  */
 public class Sender {
 
+    //Sender_isn以及命令行参数
     private int isn = 123;
     private DatagramSocket socket;
-    InetAddress ip;
-    int port;
+    private InetAddress receiverIp;
+    private int receiverPort;
+    private String fileName;
+    private int mws;
+    private int timeout;
+    private double pdrop;
+    private int seed;
+
+    private ArrayList<DatagramPacket> toSendPackets = new ArrayList<DatagramPacket>();
+    private Thread sendModule = new Thread(new Runnable() {
+        public void run() {
+            while(true){
+
+                    if(toSendPackets != null && toSendPackets.size() > 0){
+                       synchronized (toSendPackets){
+                           for(DatagramPacket packet : toSendPackets){
+                               try {
+                                   socket.send(packet);
+                               } catch (IOException e) {
+                                   e.printStackTrace();
+                               }
+                           }
+                           toSendPackets.clear();
+                       }
+                    }else {
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+            }
+
+        }
+    });
+
+    private ArrayList<DatagramPacket> reveivedPackets = new ArrayList<DatagramPacket>();
+    private Thread receiveModule = new Thread(new Runnable() {
+        public void run() {
+            while(true){
+                DatagramPacket packet = new DatagramPacket(new byte[30],30);
+                try {
+                    socket.receive(packet);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                synchronized (reveivedPackets){
+                    reveivedPackets.add(packet);
+                }
+
+            }
+        }
+    });
 
     byte[] fileData;
     byte[] data = new byte[30];
     byte front = 0;
     byte tail = 0;
     HashSet<Byte> set = new HashSet<Byte>();
-    //建立连接
-    public void connect(InetAddress ip, int port,int timeout) throws IOException, InterruptedException {
-        this.ip = ip;
-        this.port = port;
 
+    public Sender(InetAddress receiverIp, int receiverPort, String fileName, int mws, int timeout, double pdrop, int seed) {
+        this.receiverIp = receiverIp;
+        this.receiverPort = receiverPort;
+        this.fileName = fileName;
+        this.mws = mws;
+        this.timeout = timeout;
+        this.pdrop = pdrop;
+        this.seed = seed;
+    }
+
+
+    public void threeHandshake(){
+
+    }
+
+    //建立连接
+    public void connect() throws IOException, InterruptedException {
         socket = new DatagramSocket();
         Timer timer = new Timer();
         TimerTask task;
@@ -34,7 +100,7 @@ public class Sender {
         //第一次握手
         Packet packet = new Packet((byte) 1, (byte) 0, (byte) 0, (byte) isn);
         byte[] data = packet.toByteArray();
-        DatagramPacket udpPacket = new DatagramPacket(data,data.length,ip,port);
+        DatagramPacket udpPacket = new DatagramPacket(data,data.length,receiverIp,receiverPort);
         socket.send(udpPacket);
         final DatagramPacket finalPacket = udpPacket;
         task = new TimerTask() {
@@ -64,12 +130,12 @@ public class Sender {
             throw new RuntimeException("Sender第二次握手失败");
         }
         data = packet.toByteArray();
-        udpPacket = new DatagramPacket(data,data.length,ip,port);
+        udpPacket = new DatagramPacket(data,data.length,receiverIp,receiverPort);
         Thread.sleep(100);
         socket.send(udpPacket);
     }
 
-    public void transferFile(final int mws){
+    public void transferFile(){
         String str = "从c语言过来的程序员可定知道在写一些窗口程序的时候，如果要让程序暂停一段是将，那么直接引入windows.h头文件，然后在程序的任何地方写上Sleep(N)——N表示要暂停的毫秒数，就OK了，那么在java中如果要让程序暂停一段时间，使用线程中的sleep函数就能实现了。\n" +
                 "示例代码：";
         fileData = str.getBytes();
@@ -107,7 +173,7 @@ public class Sender {
                                packet.setSEQ(tail);
                                byte[] packetData = packet.toByteArray();
                                try {
-                                   socket.send(new DatagramPacket(packetData,packetData.length,ip,port));
+                                   socket.send(new DatagramPacket(packetData,packetData.length, receiverIp, receiverPort));
                                    synchronized (set){
                                        set.add(tail);
                                    }
@@ -151,11 +217,11 @@ public class Sender {
         int mws = Integer.parseInt(args[3]);
         int timeout = Integer.parseInt(args[4]);
         double pdrop = Double.parseDouble(args[5]);
-        Random random = new Random(Integer.parseInt(args[6]));
+        int seed = Integer.parseInt(args[6]);
 
-        Sender sender = new Sender();
-        sender.connect(ip,port,timeout);
-        sender.transferFile(mws);
+        Sender sender = new Sender(ip,port,file,mws,timeout,pdrop,seed);
+        sender.connect();
+        sender.transferFile();
 //        sender.close();
 
     }
