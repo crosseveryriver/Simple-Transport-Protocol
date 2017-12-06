@@ -1,9 +1,9 @@
 package sender;
 
+import util.Helper;
 import util.Packet;
 
 import java.io.*;
-import java.lang.reflect.Array;
 import java.net.*;
 import java.util.*;
 
@@ -12,6 +12,16 @@ import java.util.*;
  * 命令行参数 127.0.0.1 8800 file.txt 200 3000 0.5 50
  */
 public class Sender {
+
+    //记录日志文件相关信息
+    FileWriter writer;
+    Date startDate = new Date();
+    long totalBytes;
+    int dataSementsSent;
+    int packetsDroped;
+    int retranSements;
+    int dupAcks;
+
 
     //Sender_isn以及命令行参数
     private int isn = 123;
@@ -24,11 +34,14 @@ public class Sender {
     private double pdrop;
     private int seed;
 
-    private HashSet<DatagramPacket> toSendPackets = new HashSet<DatagramPacket>();
+    private boolean stopSendModule = false;
+    private boolean stopReceiveModule = false;
+
+    private HashSet<Packet> toSendPackets = new HashSet<Packet>();
     private Thread sendModule = new Thread(new Runnable() {
-        PLDModule module = new PLDModule(seed,pdrop);
         public void run() {
-            while (true) {
+            PLDModule module = new PLDModule(seed,pdrop);
+            while (!stopSendModule) {
                 if(toSendPackets.size() == 0){
                     try {
                         Thread.sleep(1000);
@@ -36,11 +49,18 @@ public class Sender {
                         e.printStackTrace();
                     }
                 }else{
-                    DatagramPacket packet;
-                    synchronized (toSendPackets){
-                        packet = toSendPackets.iterator().next();
-                        toSendPackets.remove(packet);
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
                     }
+                    DatagramPacket packet;
+                    Packet stpPacket;
+                    synchronized (toSendPackets){
+                        stpPacket = toSendPackets.iterator().next();
+                        toSendPackets.remove(stpPacket);
+                    }
+                    packet = new DatagramPacket(stpPacket.toByteArray(),stpPacket.size(),receiverIp,receiverPort);
                     System.out.println("sending:" + Arrays.toString(packet.getData()));
                     try {
                         module.send(packet);
@@ -50,50 +70,65 @@ public class Sender {
                 }
 
             }
-
+            packetsDroped = module.getTotalDataSementsDroped();
+            retranSements = module.getTotalDataSementsSent() - dataSementsSent;
+            System.out.println("dropPackets : " + packetsDroped + "sent" + module.getTotalDataSementsSent());
         }
     });
 
-    private ArrayList<DatagramPacket> reveivedPackets = new ArrayList<DatagramPacket>();
+    private ArrayList<DatagramPacket> receivedPackets = new ArrayList<DatagramPacket>();
     private Thread receiveModule = new Thread(new Runnable() {
+        int totalAcks = 0;
         public void run() {
-            while (true) {
+            while (!stopReceiveModule) {
                 DatagramPacket packet = new DatagramPacket(new byte[30], 30);
                 try {
                     socket.receive(packet);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                Packet stpPacket = new Packet(packet.getData());
-                System.out.println("received packet:" + Arrays.toString(stpPacket.toByteArray()));
-                if(stpPacket.getSYN() == 0 && stpPacket.getFIN() == 0 && stpPacket.getData() == null){
-                    byte seq = stpPacket.getACK();
-                    synchronized (transferingPackets){
-                        if(transferingPackets.containsKey(seq)){
-                            transferingPackets.get(seq).cancel();
-                            transferingPackets.remove(seq);
+                    Packet stpPacket = new Packet(packet.getData());
+                    System.out.println("received packet:" + Arrays.toString(stpPacket.toByteArray()));
+                    try {
+                        writer.write(Helper.getLogInfo("rcv",stpPacket,startDate));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    if(stpPacket.getSYN() == 0 && stpPacket.getFIN() == 0 && stpPacket.getData() == null){
+                        totalAcks ++;
+                        TimerTask task;
+                        byte min;
+                        byte seq = stpPacket.getACK();
+                        synchronized (transferingPackets){
+                            task = transferingPackets.remove(seq);
+                            try{
+                                min = Collections.min(transferingPackets.keySet());
+                            }catch (NoSuchElementException e){
+                                min = tail;
+                            }
+                        }
+                        front = min;
+                        if(task != null){
+                            task.cancel();
+                        }
+                    }else{
+                        synchronized (receivedPackets) {
+                            receivedPackets.add(packet);
+                            receivedPackets.notify();
                         }
                     }
-                }else{
-                    synchronized (reveivedPackets) {
-                        reveivedPackets.add(packet);
-                        reveivedPackets.notify();
-                    }
+                    System.out.println("ACK已确认");
+                } catch (IOException e) {
                 }
-
             }
+            dupAcks = totalAcks - dataSementsSent;
         }
     });
 
     HashMap<Byte, TimerTask> transferingPackets = new HashMap<Byte, TimerTask>();
 
-    byte[] fileData;
-    byte[] data = new byte[30];
-    byte front = 0;
-    byte tail = 0;
+    byte front;
+    byte tail;
     HashSet<Byte> set = new HashSet<Byte>();
 
-    public Sender(InetAddress receiverIp, int receiverPort, String fileName, int mws, int timeout, double pdrop, int seed) {
+    public Sender(InetAddress receiverIp, int receiverPort, String fileName, int mws, int timeout, double pdrop, int seed) throws IOException {
         this.receiverIp = receiverIp;
         this.receiverPort = receiverPort;
         this.fileName = fileName;
@@ -101,12 +136,14 @@ public class Sender {
         this.timeout = timeout;
         this.pdrop = pdrop;
         this.seed = seed;
+        writer = new FileWriter("data/Sender_log.txt");
     }
 
-    public void initialize() throws SocketException {
+    public void initialize() throws IOException {
         socket = new DatagramSocket();
         receiveModule.start();
         sendModule.start();
+        writer.write("<snd/rcv/drop>\t<time>\t<type of packet>\t<seq>\t<number of bytes>\t<ack-number>\t\n");
     }
 
     public void threeHandshake() throws InterruptedException {
@@ -120,10 +157,8 @@ public class Sender {
 
     public void firstHandShake() {
         Packet stpPacket = new Packet((byte) 1, (byte) 0, (byte) 0, (byte) isn);
-        byte[] data = stpPacket.toByteArray();
-        DatagramPacket packet = new DatagramPacket(data, data.length, receiverIp, receiverPort);
         synchronized (toSendPackets) {
-            toSendPackets.add(packet);
+            toSendPackets.add(stpPacket);
             toSendPackets.notify();
         }
         System.out.println("第一次握手" + Arrays.toString(stpPacket.toByteArray()));
@@ -131,11 +166,11 @@ public class Sender {
 
     public byte secondHandShake() throws InterruptedException {
         byte receiverIsn = 0;
-        synchronized (reveivedPackets) {
-            reveivedPackets.wait();
-            if (reveivedPackets.size() == 0)
+        synchronized (receivedPackets) {
+            receivedPackets.wait();
+            if (receivedPackets.size() == 0)
                 throw new RuntimeException("第二次握手失败");
-            for (DatagramPacket p : reveivedPackets) {
+            for (DatagramPacket p : receivedPackets) {
                 Packet stpp = new Packet(p.getData());
                 if (stpp.getSYN() == 1 && stpp.getACK() == (isn + 1)) {
                     receiverIsn = stpp.getSEQ();
@@ -143,40 +178,44 @@ public class Sender {
                     break;
                 }
             }
+            receivedPackets.clear();
         }
         return receiverIsn;
     }
 
-    public void thirdHandshake(byte receiverIsn) {
+    public void thirdHandshake(byte receiverIsn) throws InterruptedException {
         Packet stpPacket = new Packet((byte) 0, (byte) (receiverIsn + 1), (byte) 0, (byte) (isn + 1));
-        byte[] data = stpPacket.toByteArray();
-        DatagramPacket packet = new DatagramPacket(data, data.length, receiverIp, receiverPort);
         synchronized (toSendPackets) {
-            toSendPackets.add(packet);
+            toSendPackets.add(stpPacket);
             toSendPackets.notify();
         }
         System.out.println("第三次握手" + Arrays.toString(stpPacket.toByteArray()));
+        Thread.sleep(4000);
 
     }
 
 
     public void transferFile() throws IOException, InterruptedException {
-        FileInputStream in = new FileInputStream(new File("data/input.txt"));
+        File inputFile = new File("data/input.txt");
+        totalBytes = inputFile.length();
+        FileInputStream in = new FileInputStream(inputFile);
         byte[] data = new byte[20];
-        int length = 0;
-        byte seq = 0;
+        int length;
+        front = 0;
+        tail = 0;
         Timer timer = new Timer();
         while ((length = in.read(data)) != -1) {
-            Packet stpPacket = new Packet(data, length, seq);
-            seq++;
-            byte[] tmp = stpPacket.toByteArray();
-            final DatagramPacket packet = new DatagramPacket(tmp, tmp.length, receiverIp, receiverPort);
+            while((tail - front) > mws/20){
+                System.out.println("超出窗口大小,暂时停止发送");
+                Thread.sleep(1000);
+            }
+            final Packet stpPacket = new Packet(data, length, tail);
+            tail++;
             TimerTask task = new TimerTask() {
                 @Override
                 public void run() {
                     synchronized (toSendPackets) {
-                        toSendPackets.add(packet);
-                        toSendPackets.notify();
+                        toSendPackets.add(stpPacket);
                     }
                 }
             };
@@ -184,50 +223,144 @@ public class Sender {
                 transferingPackets.put(stpPacket.getSEQ(),task);
                 timer.schedule(task,0,timeout);
             }
+            Thread.sleep(1000);
         }
+        dataSementsSent = tail;
+        Thread.sleep(1000);
         while (true){
+            boolean sleep;
             synchronized (transferingPackets){
-                if(transferingPackets.size() > 0){
-                    Thread.sleep(2000);
-                }else {
-                    break;
-                }
+                sleep = transferingPackets.size() > 0;
+            }
+            if(sleep){
+                Thread.sleep(2000);
+            }else {
+                break;
             }
         }
+        synchronized (toSendPackets){
+            toSendPackets.clear();
+        }
+        timer.cancel();
     }
 
-    public void close() {
-        fourHandshake();
-//        socket.close();
-    }
-
-    public void fourHandshake() {
+    public void fourHandshake() throws InterruptedException {
         fourthHandshake();
         fifthHandshake();
-        sixthHandshake();
-        seventhHandshake();
+        byte receiverIsn = sixthHandshake();
+        seventhHandshake(receiverIsn);
     }
 
     public void fourthHandshake() {
-        Packet packet = new Packet((byte) 0, (byte) 0, (byte) 1, (byte) isn);
-        byte[] data = packet.toByteArray();
-        DatagramPacket udpPacket = new DatagramPacket(data, data.length, receiverIp, receiverPort);
+        Packet packet = new Packet((byte) 0, (byte) 0, (byte) isn, (byte) 0);
         synchronized (toSendPackets) {
-            toSendPackets.add(udpPacket);
+            toSendPackets.add(packet);
             toSendPackets.notify();
         }
     }
 
-    public void fifthHandshake() {
+    public void fifthHandshake() throws InterruptedException {
+        synchronized (receivedPackets) {
+            receivedPackets.wait();
+            if (receivedPackets.size() == 0)
+                throw new RuntimeException("第五次握手失败");
+            for (DatagramPacket p : receivedPackets) {
+                Packet stpp = new Packet(p.getData());
+                if (stpp.getFIN() != 0 && stpp.getACK() == (isn + 1) ) {
+                    System.out.println("第五次握手" + Arrays.toString(stpp.toByteArray()));
+                    break;
+                }
+            }
+            receivedPackets.clear();
+        }
     }
 
-    public void sixthHandshake() {
+    public byte sixthHandshake() throws InterruptedException {
+        byte receiverIsn = 0;
+        synchronized (receivedPackets) {
+            receivedPackets.wait();
+            if (receivedPackets.size() == 0)
+                throw new RuntimeException("第六次握手失败");
+            for (DatagramPacket p : receivedPackets) {
+                Packet stpp = new Packet(p.getData());
+                if (stpp.getFIN() != 0 ) {
+                    receiverIsn = stpp.getFIN();
+                    System.out.println("第六次握手" + Arrays.toString(stpp.toByteArray()));
+                    break;
+                }
+            }
+            receivedPackets.clear();
+        }
+        return receiverIsn;
     }
 
-    public void seventhHandshake() {
+    public void seventhHandshake(byte receiverIsn) {
+        Packet packet = new Packet((byte) 0, (byte) (receiverIsn + 1), (byte) isn, (byte) 0);
+        synchronized (toSendPackets) {
+            toSendPackets.add(packet);
+            toSendPackets.notify();
+        }
     }
 
+    public void close() throws InterruptedException, IOException {
+        fourHandshake();
+        Thread.sleep(2000);
+        stopReceiveModule = true;
+        stopSendModule = true;
+        int sleepTimes = 0;
+        while (sendModule.isAlive() && (sleepTimes > 3)){
+            sleepTimes ++;
+            Thread.sleep(2000);
+        }
+        socket.close();
+        while (receiveModule.isAlive()){
+            Thread.sleep(2000);
+        }
+        writer.write("Amount(Original) Data Transfered(in bytes) : "+ totalBytes + "\n"
+                + "Number of Data segments sent(excluding retransmissions) : " + dataSementsSent + "\n"
+                + "Number of (all) Packets Droped (by PLD Module) : " + packetsDroped + "\n"
+                + "Number of Retransmitted segments : " + retranSements + "\n"
+                + "Number of Duplicate Acknowledgements Received : " + dupAcks + "\n"
+        );
+        writer.flush();
+        writer.close();
+    }
+    class PLDModule{
+        private Random random;
+        private double pdrop;
+        //四条发送的握手信息,所以初始值为-4
+        int totalDataSementsSent = -4;
+        int totalDataSementsDroped = 0;
+        PLDModule(int seed,double pdrop){
+            this.random = new Random(seed);
+            this.pdrop = pdrop;
+        }
 
+        public  int getTotalDataSementsSent() {
+            return totalDataSementsSent;
+        }
+        public int getTotalDataSementsDroped() {
+            return totalDataSementsDroped;
+        }
+        public void send(DatagramPacket packet) throws IOException {
+            totalDataSementsSent ++;
+            Packet stpPacket = new Packet(packet.getData());
+            String sndOrDrop;
+            if(stpPacket.getData() != null && random.nextDouble() < pdrop){
+                sndOrDrop = "drop";
+                totalDataSementsDroped ++;
+            }else{
+                sndOrDrop = "snd";
+                socket.send(packet);
+            }
+            writer.write(Helper.getLogInfo(sndOrDrop,stpPacket,startDate));
+        }
+
+    }
+
+    private double getCurrentTimeInSeconds(){
+        return (new Date().getTime() - startDate.getTime()) / 1000.0;
+    }
     public static void main(String[] args) throws IOException, InterruptedException {
         String[] addrstr = args[0].split("\\.");
         byte[] addrbyte = new byte[4];
@@ -250,24 +383,5 @@ public class Sender {
 
     }
 
-    private boolean packetContainsData(DatagramPacket packet) {
-        return packet.getData().length > 10;
-    }
-
-    class PLDModule{
-        private Random random;
-        private double pdrop;
-        PLDModule(int seed,double pdrop){
-            this.random = new Random(seed);
-            this.pdrop = pdrop;
-        }
-        public void send(DatagramPacket packet) throws IOException {
-            if(new Packet(packet.getData()).getData() != null && random.nextDouble() < pdrop){
-                //丢失的数据包
-            }else{
-                socket.send(packet);
-            }
-        }
-    }
 
 }

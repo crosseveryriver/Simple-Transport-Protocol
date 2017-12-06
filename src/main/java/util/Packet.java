@@ -114,6 +114,9 @@ public class Packet implements Serializable{
         return result;
     }
 
+    public int size(){
+        return (data == null ? 0 : data.length) + 10;
+    }
 
     @Override
     public boolean equals(Object o) {
