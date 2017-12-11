@@ -9,7 +9,7 @@ import java.util.*;
 
 /**
  * Created by Administrator on 2017/12/4.
- * 命令行参数 127.0.0.1 8800 file.txt 200 3000 0.5 50
+ * 命令行参数 127.0.0.1 8800 data/input.txt 200 3000 0.5 50
  */
 public class Sender {
 
@@ -196,7 +196,7 @@ public class Sender {
 
 
     public void transferFile() throws IOException, InterruptedException {
-        File inputFile = new File("data/input.txt");
+        File inputFile = new File(fileName);
         totalBytes = inputFile.length();
         FileInputStream in = new FileInputStream(inputFile);
         byte[] data = new byte[20];

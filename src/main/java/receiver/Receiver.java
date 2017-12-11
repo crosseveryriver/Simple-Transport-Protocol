@@ -12,7 +12,7 @@ import java.util.*;
 
 /**
  * Created by Administrator on 2017/12/4.
- * 命令行参数 8800 file.txt
+ * 命令行参数 8800 data/output.txt
  */
 public class Receiver {
 
@@ -65,7 +65,7 @@ public class Receiver {
         }
     }
 
-    public void saveData() throws IOException, InterruptedException {
+    public void saveData(String fileName) throws IOException, InterruptedException {
 
 
         do {
@@ -102,7 +102,7 @@ public class Receiver {
                 return o1.getSEQ() - o2.getSEQ();
             }
         });
-        RandomAccessFile out = new RandomAccessFile("data/output.txt", "rw");
+        RandomAccessFile out = new RandomAccessFile(fileName, "rw");
         out.seek(out.length());
         for (Packet p : stpPackets) {
             totalBytes += p.getData().length;
@@ -141,7 +141,7 @@ public class Receiver {
         String file = args[1];
         Receiver receiver = new Receiver();
         receiver.waitAndConnect(port);
-        receiver.saveData();
+        receiver.saveData(file);
         receiver.handleClose();
 
     }
