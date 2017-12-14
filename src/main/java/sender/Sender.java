@@ -9,9 +9,13 @@ import java.util.*;
 
 /**
  * Created by Administrator on 2017/12/4.
- * 命令行参数 127.0.0.1 8800 data/input.txt 200 3000 0.5 50
+ * 命令行参数 127.0.0.1 8800 data/input.txt 10340 3000 0.5 50
  */
 public class Sender {
+
+    //定义常量
+    private final int LENGTH = 1034;
+    private final int DATA_LENGTH=LENGTH-10;
 
     //记录日志文件相关信息
     FileWriter writer;
@@ -50,7 +54,7 @@ public class Sender {
                     }
                 }else{
                     try {
-                        Thread.sleep(1000);
+                        Thread.sleep(100);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -81,7 +85,7 @@ public class Sender {
         int totalAcks = 0;
         public void run() {
             while (!stopReceiveModule) {
-                DatagramPacket packet = new DatagramPacket(new byte[30], 30);
+                DatagramPacket packet = new DatagramPacket(new byte[1034], 1034);
                 try {
                     socket.receive(packet);
                     Packet stpPacket = new Packet(packet.getData());
@@ -199,13 +203,13 @@ public class Sender {
         File inputFile = new File(fileName);
         totalBytes = inputFile.length();
         FileInputStream in = new FileInputStream(inputFile);
-        byte[] data = new byte[20];
+        byte[] data = new byte[1024];
         int length;
         front = 0;
         tail = 0;
         Timer timer = new Timer();
         while ((length = in.read(data)) != -1) {
-            while((tail - front) > mws/20){
+            while((tail - front) > mws/1024){
                 System.out.println("超出窗口大小,暂时停止发送");
                 Thread.sleep(1000);
             }

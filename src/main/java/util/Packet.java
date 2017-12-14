@@ -19,13 +19,13 @@ public class Packet implements Serializable{
     public Packet(byte[] data,int length,byte seq){
         byte[] tmp = new byte[length];
         System.arraycopy(data,0,tmp,0,length);
-        if(tmp.length > 20)
+        if(tmp.length > 1024)
             throw new RuntimeException("STP packet data too long");
         this.data = tmp;
         this.SEQ = seq;
     }
     public Packet(byte[] data,byte seq){
-        if(data.length > 20)
+        if(data.length > 1024)
             throw new RuntimeException("STP packet data too long");
        this.data = data;
        this.SEQ = seq;
@@ -39,9 +39,9 @@ public class Packet implements Serializable{
     }
 
     public Packet(byte[] packet){
-        if(packet[0] > 0){
-            data = new byte[20];
-            System.arraycopy(packet,10,data,0,packet[0]);
+        if(packet[0] == 11){
+            data = new byte[1024];
+            System.arraycopy(packet,10,data,0,data.length);
         }
         SYN = packet[1];
         ACK = packet[2];
@@ -103,10 +103,10 @@ public class Packet implements Serializable{
         if(data == null){
             result = new byte[10];
         }else {
-            result = new byte[30];
+            result = new byte[1034];
             System.arraycopy(data,0,result,10,data.length);
         }
-        result[0] = (data == null) ? 0 : (byte) data.length;
+        result[0] = (data == null) ? (byte) 10 : (byte) 11;
         result[1] = SYN;
         result[2] = ACK;
         result[3] = FIN;
@@ -115,7 +115,7 @@ public class Packet implements Serializable{
     }
 
     public int size(){
-        return (data == null ? 0 : data.length) + 10;
+        return (data == null ? 10 : 1034);
     }
 
     @Override

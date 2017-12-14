@@ -16,6 +16,11 @@ import java.util.*;
  */
 public class Receiver {
 
+    //定义常量
+    private final int LENGTH = 1034;
+    private final int DATA_LENGTH=LENGTH-10;
+
+
     private int isn = 32;
     private DatagramSocket socket;
     HashSet<Packet> buffer = new HashSet<Packet>();
@@ -70,7 +75,7 @@ public class Receiver {
 
         do {
             try {
-                byte[] data = new byte[30];
+                byte[] data = new byte[LENGTH];
                 DatagramPacket packet = new DatagramPacket(data, data.length);
                 socket.receive(packet);
                 System.out.println(Arrays.toString(data));
