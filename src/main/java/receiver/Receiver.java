@@ -9,7 +9,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.util.*;
-
+import static util.Constants.LENGTH;
 /**
  * Created by Administrator on 2017/12/4.
  * 命令行参数 8800 data/output.txt
@@ -17,7 +17,7 @@ import java.util.*;
 public class Receiver {
 
     //定义常量
-    private final int LENGTH = 1034;
+//    private final int LENGTH = 1034;
     private final int DATA_LENGTH=LENGTH-10;
 
 

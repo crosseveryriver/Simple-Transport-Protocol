@@ -6,6 +6,7 @@ import util.Packet;
 import java.io.*;
 import java.net.*;
 import java.util.*;
+import static util.Constants.LENGTH;
 
 /**
  * Created by Administrator on 2017/12/4.
@@ -14,7 +15,7 @@ import java.util.*;
 public class Sender {
 
     //定义常量
-    private final int LENGTH = 1034;
+//    private final int LENGTH = 1034;
     private final int DATA_LENGTH=LENGTH-10;
 
     //记录日志文件相关信息
@@ -85,7 +86,7 @@ public class Sender {
         int totalAcks = 0;
         public void run() {
             while (!stopReceiveModule) {
-                DatagramPacket packet = new DatagramPacket(new byte[1034], 1034);
+                DatagramPacket packet = new DatagramPacket(new byte[LENGTH], LENGTH);
                 try {
                     socket.receive(packet);
                     Packet stpPacket = new Packet(packet.getData());
@@ -203,13 +204,13 @@ public class Sender {
         File inputFile = new File(fileName);
         totalBytes = inputFile.length();
         FileInputStream in = new FileInputStream(inputFile);
-        byte[] data = new byte[1024];
+        byte[] data = new byte[DATA_LENGTH];
         int length;
         front = 0;
         tail = 0;
         Timer timer = new Timer();
         while ((length = in.read(data)) != -1) {
-            while((tail - front) > mws/1024){
+            while((tail - front) > mws/DATA_LENGTH){
                 System.out.println("超出窗口大小,暂时停止发送");
                 Thread.sleep(1000);
             }

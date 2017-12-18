@@ -4,12 +4,16 @@ import com.sun.xml.internal.bind.v2.runtime.reflect.Lister;
 
 import java.io.Serializable;
 import java.util.Arrays;
-
+import static util.Constants.LENGTH;
 /**
  * Created by Administrator on 2017/12/4.
  * 包含请求头和数据,放在DatagramPacket中
  */
 public class Packet implements Serializable{
+    //定义常量
+//    private final int LENGTH = 1034;
+    private final int DATA_LENGTH=LENGTH-10;
+
     private byte SYN = 0;
     private byte ACK = 0;
     private byte FIN = 0;
@@ -19,13 +23,13 @@ public class Packet implements Serializable{
     public Packet(byte[] data,int length,byte seq){
         byte[] tmp = new byte[length];
         System.arraycopy(data,0,tmp,0,length);
-        if(tmp.length > 1024)
+        if(tmp.length > DATA_LENGTH)
             throw new RuntimeException("STP packet data too long");
         this.data = tmp;
         this.SEQ = seq;
     }
     public Packet(byte[] data,byte seq){
-        if(data.length > 1024)
+        if(data.length > DATA_LENGTH)
             throw new RuntimeException("STP packet data too long");
        this.data = data;
        this.SEQ = seq;
@@ -40,7 +44,7 @@ public class Packet implements Serializable{
 
     public Packet(byte[] packet){
         if(packet[0] == 11){
-            data = new byte[1024];
+            data = new byte[DATA_LENGTH];
             System.arraycopy(packet,10,data,0,data.length);
         }
         SYN = packet[1];
@@ -103,7 +107,7 @@ public class Packet implements Serializable{
         if(data == null){
             result = new byte[10];
         }else {
-            result = new byte[1034];
+            result = new byte[LENGTH];
             System.arraycopy(data,0,result,10,data.length);
         }
         result[0] = (data == null) ? (byte) 10 : (byte) 11;
@@ -115,7 +119,7 @@ public class Packet implements Serializable{
     }
 
     public int size(){
-        return (data == null ? 10 : 1034);
+        return (data == null ? 10 : LENGTH);
     }
 
     @Override
