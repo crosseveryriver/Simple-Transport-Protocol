@@ -369,7 +369,7 @@ public class Sender {
         String[] addrstr = args[0].split("\\.");
         byte[] addrbyte = new byte[4];
         for (int i = 0; i < addrbyte.length; i++) {
-            addrbyte[i] = Byte.parseByte(addrstr[i]);
+            addrbyte[i] = (byte) Integer.parseInt(addrstr[i]);
         }
         Inet4Address ip = (Inet4Address) Inet4Address.getByAddress(addrbyte);
         int port = Integer.parseInt(args[1]);
