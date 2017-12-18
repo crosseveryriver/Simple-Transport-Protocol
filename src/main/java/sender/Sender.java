@@ -10,7 +10,7 @@ import static util.Constants.LENGTH;
 
 /**
  * Created by Administrator on 2017/12/4.
- * 命令行参数 127.0.0.1 8800 data/input.txt 10340 3000 0.5 50
+ * 命令行参数 127.0.0.1 8800 data/input.txt 103400 3000 0.5 50
  */
 public class Sender {
 
