@@ -18,11 +18,27 @@ public class Test {
 
     public static void main(String[] args) throws IOException, InterruptedException {
         Test t = new Test();
-        Random random = new Random(50);
-        for (int i = 0; i < 20; i++) {
-            System.out.println(random.nextDouble());
+        t.testTransferSpeed();
+    }
 
+
+    public void testTransferSpeed() throws IOException {
+        DatagramSocket socket1 = new DatagramSocket();
+        DatagramSocket socket2 = new DatagramSocket(9999);
+        DatagramPacket datagramPacket1 = new DatagramPacket(new byte[1024],1024,InetAddress.getByAddress(new byte[]{
+            (byte) 127, 0,0,1
+        }),9999);
+        DatagramPacket datagramPacket2 = new DatagramPacket(new byte[1024],1024);
+        for (int i = 0; i < 100; i++) {
+            System.out.println("send");
+            socket1.send(datagramPacket1);
         }
+        for (int i = 0; i < 100; i++) {
+            System.out.println("receive" + i);
+            socket2.receive(datagramPacket2);
+        }
+        socket1.close();
+        socket2.close();
     }
 
     public void testTime() throws InterruptedException {

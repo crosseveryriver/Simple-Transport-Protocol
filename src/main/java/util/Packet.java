@@ -43,8 +43,8 @@ public class Packet implements Serializable{
     }
 
     public Packet(byte[] packet){
-        if(packet[0] == 11){
-            data = new byte[DATA_LENGTH];
+        if(packet[0] == 1){
+            data = new byte[packet[5] + 128 * packet[6]];
             System.arraycopy(packet,10,data,0,data.length);
         }
         SYN = packet[1];
@@ -110,11 +110,13 @@ public class Packet implements Serializable{
             result = new byte[LENGTH];
             System.arraycopy(data,0,result,10,data.length);
         }
-        result[0] = (data == null) ? (byte) 10 : (byte) 11;
+        result[0] = (data == null) ? (byte) 0 : 1;
         result[1] = SYN;
         result[2] = ACK;
         result[3] = FIN;
         result[4] = SEQ;
+        result[5] = (data == null) ? 0 : (byte) (data.length%128);
+        result[6] = (data == null) ? 0 : (byte) (data.length/128);
         return result;
     }
 

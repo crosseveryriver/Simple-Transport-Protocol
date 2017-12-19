@@ -49,16 +49,16 @@ public class Sender {
             while (!stopSendModule) {
                 if(toSendPackets.size() == 0){
                     try {
-                        Thread.sleep(1000);
+                        Thread.sleep(2);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
                 }else{
-                    try {
-                        Thread.sleep(100);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
+//                    try {
+//                        Thread.sleep(100);
+//                    } catch (InterruptedException e) {
+//                        e.printStackTrace();
+//                    }
                     DatagramPacket packet;
                     Packet stpPacket;
                     synchronized (toSendPackets){
@@ -66,7 +66,6 @@ public class Sender {
                         toSendPackets.remove(stpPacket);
                     }
                     packet = new DatagramPacket(stpPacket.toByteArray(),stpPacket.size(),receiverIp,receiverPort);
-                    System.out.println("sending:" + Arrays.toString(packet.getData()));
                     try {
                         module.send(packet);
                     } catch (IOException e) {
@@ -195,7 +194,7 @@ public class Sender {
             toSendPackets.notify();
         }
         System.out.println("第三次握手" + Arrays.toString(stpPacket.toByteArray()));
-        Thread.sleep(4000);
+        Thread.sleep(40);
 
     }
 
@@ -212,7 +211,7 @@ public class Sender {
         while ((length = in.read(data)) != -1) {
             while((tail - front) > mws/DATA_LENGTH){
                 System.out.println("超出窗口大小,暂时停止发送");
-                Thread.sleep(1000);
+                Thread.sleep(2);
             }
             final Packet stpPacket = new Packet(data, length, tail);
             tail++;
@@ -228,17 +227,17 @@ public class Sender {
                 transferingPackets.put(stpPacket.getSEQ(),task);
                 timer.schedule(task,0,timeout);
             }
-            Thread.sleep(1000);
+            Thread.sleep(1);
         }
         dataSementsSent = tail;
-        Thread.sleep(1000);
+        Thread.sleep(2);
         while (true){
             boolean sleep;
             synchronized (transferingPackets){
                 sleep = transferingPackets.size() > 0;
             }
             if(sleep){
-                Thread.sleep(2000);
+                Thread.sleep(4);
             }else {
                 break;
             }
@@ -309,17 +308,17 @@ public class Sender {
 
     public void close() throws InterruptedException, IOException {
         fourHandshake();
-        Thread.sleep(2000);
+        Thread.sleep(20);
         stopReceiveModule = true;
         stopSendModule = true;
         int sleepTimes = 0;
         while (sendModule.isAlive() && (sleepTimes > 3)){
             sleepTimes ++;
-            Thread.sleep(2000);
+            Thread.sleep(20);
         }
         socket.close();
         while (receiveModule.isAlive()){
-            Thread.sleep(2000);
+            Thread.sleep(20);
         }
         writer.write("Amount(Original) Data Transfered(in bytes) : "+ totalBytes + "\n"
                 + "Number of Data segments sent(excluding retransmissions) : " + dataSementsSent + "\n"
@@ -353,9 +352,11 @@ public class Sender {
             String sndOrDrop;
             if(stpPacket.getData() != null && random.nextDouble() < pdrop){
                 sndOrDrop = "drop";
+                System.out.println("drop:" + Arrays.toString(packet.getData()));
                 totalDataSementsDroped ++;
             }else{
                 sndOrDrop = "snd";
+                System.out.println("sending:" + Arrays.toString(packet.getData()));
                 socket.send(packet);
             }
             writer.write(Helper.getLogInfo(sndOrDrop,stpPacket,startDate));
