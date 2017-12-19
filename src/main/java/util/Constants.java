@@ -5,5 +5,5 @@ package util;
  */
 public class Constants
 {
-    public static final int LENGTH = 10340;
+    public static int LENGTH = 10340;
 }

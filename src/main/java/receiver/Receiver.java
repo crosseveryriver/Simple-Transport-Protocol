@@ -16,11 +16,6 @@ import static util.Constants.LENGTH;
  */
 public class Receiver {
 
-    //定义常量
-//    private final int LENGTH = 1034;
-    private final int DATA_LENGTH=LENGTH-10;
-
-
     private int isn = 32;
     private DatagramSocket socket;
     HashSet<Packet> buffer = new HashSet<Packet>();

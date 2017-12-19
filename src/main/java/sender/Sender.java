@@ -1,5 +1,6 @@
 package sender;
 
+import util.Constants;
 import util.Helper;
 import util.Packet;
 
@@ -10,7 +11,7 @@ import static util.Constants.LENGTH;
 
 /**
  * Created by Administrator on 2017/12/4.
- * 命令行参数 127.0.0.1 8800 data/input.txt 103400 3000 0.5 50
+ * 命令行参数 127.0.0.1 8800 data/input.txt 103400 10340 30 0.2 50
  */
 public class Sender {
 
@@ -377,9 +378,11 @@ public class Sender {
         int port = Integer.parseInt(args[1]);
         String file = args[2];
         int mws = Integer.parseInt(args[3]);
-        int timeout = Integer.parseInt(args[4]);
-        double pdrop = Double.parseDouble(args[5]);
-        int seed = Integer.parseInt(args[6]);
+        int mss = Integer.parseInt(args[4]);
+        Constants.LENGTH = mss;
+        int timeout = Integer.parseInt(args[5]);
+        double pdrop = Double.parseDouble(args[6]);
+        int seed = Integer.parseInt(args[7]);
 
         Sender sender = new Sender(ip, port, file, mws, timeout, pdrop, seed);
         sender.initialize();
