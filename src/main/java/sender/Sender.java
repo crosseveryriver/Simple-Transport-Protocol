@@ -22,11 +22,11 @@ public class Sender {
     //记录日志文件相关信息
     FileWriter writer;
     Date startDate = new Date();
-    long totalBytes;
-    int dataSementsSent;
-    int packetsDroped;
-    int retranSements;
-    int dupAcks;
+    volatile long totalBytes;
+    volatile int dataSementsSent;
+    volatile int packetsDroped;
+    volatile int retranSements;
+    volatile int dupAcks;
 
 
     //Sender_isn以及命令行参数
