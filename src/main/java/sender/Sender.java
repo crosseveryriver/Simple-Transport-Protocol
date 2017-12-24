@@ -19,6 +19,11 @@ public class Sender {
 //    private final int LENGTH = 1034;
     private final int DATA_LENGTH=LENGTH-10;
 
+    //计算timeout
+    volatile int packetCount = 0;
+    volatile long myTimeout = 0;
+
+
     //记录日志文件相关信息
     FileWriter writer;
     Date startDate = new Date();
@@ -36,7 +41,7 @@ public class Sender {
     private int receiverPort;
     private String fileName;
     private int mws;
-    private int timeout;
+    volatile private int timeout;
     private double pdrop;
     private int seed;
 
@@ -98,7 +103,7 @@ public class Sender {
                     }
                     if(stpPacket.getSYN() == 0 && stpPacket.getFIN() == 0 && stpPacket.getData() == null){
                         totalAcks ++;
-                        TimerTask task;
+                        MyTask task;
                         byte min;
                         byte seq = stpPacket.getACK();
                         synchronized (transferingPackets){
@@ -111,6 +116,12 @@ public class Sender {
                         }
                         front = min;
                         if(task != null){
+                            long tmp = task.getTimeout();
+                            myTimeout = ((myTimeout * packetCount) + tmp)/ (packetCount + 1);
+                            packetCount ++;
+                            //更改timeout策略
+//                            timeout = (int) myTimeout;
+                            System.out.println("curent timeout :" + myTimeout );
                             task.cancel();
                         }
                     }else{
@@ -127,7 +138,7 @@ public class Sender {
         }
     });
 
-    HashMap<Byte, TimerTask> transferingPackets = new HashMap<Byte, TimerTask>();
+    HashMap<Byte, MyTask> transferingPackets = new HashMap<Byte, MyTask>();
 
     byte front;
     byte tail;
@@ -216,14 +227,7 @@ public class Sender {
             }
             final Packet stpPacket = new Packet(data, length, tail);
             tail++;
-            TimerTask task = new TimerTask() {
-                @Override
-                public void run() {
-                    synchronized (toSendPackets) {
-                        toSendPackets.add(stpPacket);
-                    }
-                }
-            };
+            MyTask task = new MyTask(stpPacket,new Date().getTime());
             synchronized (transferingPackets){
                 transferingPackets.put(stpPacket.getSEQ(),task);
                 timer.schedule(task,0,timeout);
@@ -393,4 +397,22 @@ public class Sender {
     }
 
 
+    class MyTask extends TimerTask{
+        private Packet stpPacket;
+        private long begin;
+        public MyTask(Packet stpPacket,long begin){
+            this.stpPacket = stpPacket;
+            this.begin = begin;
+        }
+
+        public void run() {
+            synchronized (toSendPackets) {
+                toSendPackets.add(stpPacket);
+            }
+        }
+
+        public long getTimeout(){
+            return new Date().getTime() - begin;
+        }
+    }
 }
