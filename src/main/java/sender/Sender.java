@@ -45,10 +45,13 @@ public class Sender {
     private double pdrop;
     private int seed;
 
+    //是否停止接受模块,发送模块
     private boolean stopSendModule = false;
     private boolean stopReceiveModule = false;
 
+    //待发送的Packet,当该集合不为空的时候,sendModule选择其中的一个Packet发送给Receiver
     private HashSet<Packet> toSendPackets = new HashSet<Packet>();
+    //专门用来发送数据的线程
     private Thread sendModule = new Thread(new Runnable() {
         public void run() {
             PLDModule module = new PLDModule(seed,pdrop);
@@ -73,6 +76,7 @@ public class Sender {
                     }
                     packet = new DatagramPacket(stpPacket.toByteArray(),stpPacket.size(),receiverIp,receiverPort);
                     try {
+                        //使用PLD模块模拟发送数据报,有可能会drop,也有可能发送成功
                         module.send(packet);
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -86,7 +90,9 @@ public class Sender {
         }
     });
 
+    //接收到的Packet,这个链表中只保存和握手相关的Packet,保存之后,由主线程处理相关数据.和握手无关的Packet在receiveModule中已经处理过了,因此不保存在这个链表中
     private ArrayList<DatagramPacket> receivedPackets = new ArrayList<DatagramPacket>();
+    //接受receiver发送数据的模块
     private Thread receiveModule = new Thread(new Runnable() {
         int totalAcks = 0;
         public void run() {
@@ -106,6 +112,7 @@ public class Sender {
                         MyTask task;
                         byte min;
                         byte seq = stpPacket.getACK();
+                        //接收到数据报文确认消息后,将该报文从transferingPackets中删除,并取消与保温对应的计时器
                         synchronized (transferingPackets){
                             task = transferingPackets.remove(seq);
                             try{
@@ -119,7 +126,7 @@ public class Sender {
                             long tmp = task.getTimeout();
                             myTimeout = ((myTimeout * packetCount) + tmp)/ (packetCount + 1);
                             packetCount ++;
-                            //更改timeout策略
+                            //更改timeout策略,应用下面一行代码即可根据数据报平均往返时间自动更改并应用timeout值
 //                            timeout = (int) myTimeout;
                             System.out.println("curent timeout :" + myTimeout );
                             task.cancel();
@@ -155,6 +162,7 @@ public class Sender {
         writer = new FileWriter("data/Sender_log.txt");
     }
 
+    //初始化连接,启动相关线程,准备文件读写
     public void initialize() throws IOException {
         socket = new DatagramSocket();
         receiveModule.start();
@@ -210,7 +218,7 @@ public class Sender {
 
     }
 
-
+    //三次握手后,开始发送数据
     public void transferFile() throws IOException, InterruptedException {
         File inputFile = new File(fileName);
         totalBytes = inputFile.length();
@@ -220,6 +228,9 @@ public class Sender {
         front = 0;
         tail = 0;
         Timer timer = new Timer();
+        //循环读取输入文件,如果不超过窗口大小就将数据封装之后,添加到toSendPackets中,等待sendModule发送数据;
+        // 封装的同时会为每个数据报启动一个计时器,如果超过timeout时间之后,就在此向toSendPackets中加入数据报;
+        //添加到toSendPackets的同时也会在transferingPackets中添加相应的报文和计时器的映射
         while ((length = in.read(data)) != -1) {
             while((tail - front) > mws/DATA_LENGTH){
                 System.out.println("超出窗口大小,暂时停止发送");
@@ -351,6 +362,7 @@ public class Sender {
         public int getTotalDataSementsDroped() {
             return totalDataSementsDroped;
         }
+        //以一定的概率drop数据报
         public void send(DatagramPacket packet) throws IOException {
             totalDataSementsSent ++;
             Packet stpPacket = new Packet(packet.getData());
